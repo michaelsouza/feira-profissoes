@@ -1,17 +1,13 @@
 import sys
 import json
-import time
 from openai import OpenAI
-from textwrap import dedent
 from dotenv import load_dotenv
-from sympy import sympify, pretty
 from code_interpreter import CodeInterpreter
 from rich.console import Console
 from rich.panel import Panel
-from rich.text import Text
 from rich.prompt import Prompt
-from rich.table import Table
 from rich.progress import Progress
+from typing import List
 
 console = Console()
 
@@ -71,22 +67,7 @@ def call_coder(code: str) -> str:
 
 
 def solve_math_problem(user_question):
-    messages = initialize_messages(user_question)
-    console.print(
-        Panel(
-            f"[bold yellow]Solving Math Problem:[/bold yellow] {user_question}",
-            title="Math Problem",
-            expand=False,
-        )
-    )
-
-    with Progress() as progress:
-        task = progress.add_task("[cyan]Solving Math Problem...", total=100)
-        run_math_solver_loop(messages, task, progress)
-
-
-def initialize_messages(user_question):
-    return [
+    messages = [
         {
             "role": "assistant",
             "content": math_tutor_prompt,
@@ -97,70 +78,86 @@ def initialize_messages(user_question):
         },
     ]
 
+    console.print(
+        Panel(
+            f"[bold yellow]Solving Math Problem:[/bold yellow]\n{user_question}",
+            title="Math Problem",
+            expand=False,
+        )
+    )
 
-def run_math_solver_loop(messages, task, progress):
-    while True:
-        progress.update(task, advance=10)
-        chat_response, finish_reason = get_chat_response(messages)
+    with Progress() as progress:
+        task = progress.add_task("[cyan]Solving Math Problem...", total=100)
+        while True:
+            progress.update(task, advance=10)
+            chat_message, finish_reason = call_chat(messages)
 
-        if finish_reason == "stop":
-            progress.update(task, advance=100)
-            display_solution(chat_response.choices[0].message.content)
-            break
+            if finish_reason == "stop":
+                progress.update(task, advance=100)
+                display_solution(messages)
+                break
+            elif finish_reason == "tool_calls":
+                handle_tool_calls(chat_message, messages)
+            else:
+                raise Exception(f"Unexpected finish reason: {finish_reason}")
 
-        if finish_reason == "tool_calls":
-            handle_tool_calls(chat_response.choices[0].message, messages)
 
-
-def get_chat_response(messages):
+def call_chat(messages: List[dict]):
+    # call the OpenAI API to get a response
     chat_response = client.chat.completions.create(
         model=MODEL,
         messages=messages,
         tools=tools,
     )
-    return chat_response, chat_response.choices[0].finish_reason
+    chat_message = chat_response.choices[0].message
+    finish_reason = chat_response.choices[0].finish_reason
+    messages.append(chat_message.to_dict())
+    return chat_message, finish_reason
 
 
 def handle_tool_calls(chat_message, messages):
-    messages.append(chat_message)
     tool_calls = chat_message.tool_calls
-
     for tool_call in tool_calls:
-        func_name, func_args = parse_tool_call(tool_call)
-        display_tool_call_info(func_name)
-
+        # get the function name and arguments
+        func = tool_call.to_dict()["function"]
+        func_name = func["name"]
+        func_args = json.loads(func["arguments"])
+        console.print(
+            f"\n:gear: [bold magenta] Function Call:[/bold magenta] {func_name}"
+        )
         if func_name == "call_coder":
             execute_call_coder(func_args, tool_call.id, messages)
-
-
-def parse_tool_call(tool_call):
-    func = tool_call.to_dict()["function"]
-    func_name = func["name"]
-    func_args = json.loads(func["arguments"])
-    return func_name, func_args
-
-
-def display_tool_call_info(func_name):
-    console.print(f":gear: [bold magenta] Function Call:[/bold magenta] {func_name}")
+        else:
+            raise Exception(f"Unknown function: {func_name}")
 
 
 def execute_call_coder(func_args, tool_call_id, messages):
     code = func_args["code"]
     console.print(":rocket: [bold green]Calling Code Interpreter...[/bold green]")
     func_output = call_coder(code)
-    tool_message = {
+    coder_output_message = {
         "role": "tool",
         "content": json.dumps({"code": code, "output": func_output}),
         "tool_call_id": tool_call_id,
     }
-    messages.append(tool_message)
+    messages.append(coder_output_message)
 
 
-def display_solution(solution_content):
+def display_solution(messages: list):
+    messages = [m for m in messages if isinstance(m, dict)]
+    # drop the first two messages (prompt and user question)
+    messages = messages[2:]
+    solution = ""
+    for m in messages:
+        # skip tool messages. it's already displayed in the code interpreter output
+        if m['role'] == 'tool':
+            continue
+        solution += f"{m['content']}\n"
+
     console.print("\n")
     console.print(
         Panel(
-            f"[bold green]Solution Completed:[/bold green]\n{solution_content}",
+            f"[bold green]Solution Completed:[/bold green]\n{solution}",
             title="Completion",
             expand=False,
         )
@@ -169,14 +166,24 @@ def display_solution(solution_content):
 
 def main():
     while True:
-        user_question = Prompt.ask("[bold yellow]Insira um problema matemático (or digite 'exit' to sair)[/bold yellow]\n")
-        
-        if user_question.lower() == 'exit':
-            console.print(Panel("[bold red]Finalizando...[/bold red]", title="Exit", expand=False))
+        user_question = Prompt.ask(
+            "[bold yellow]Insira um problema matemático (or digite 'exit' to sair)[/bold yellow]\n"
+        )
+
+        if user_question.lower() == "exit":
+            console.print(
+                Panel("[bold red]Finalizando...[/bold red]", title="Exit", expand=False)
+            )
             break
-        
+
         solve_math_problem(user_question)
 
 
+def test_main():
+    user_question = "Qual é o resultado de $\\int_{0}^{3.75} x^2 dx$?"
+    solve_math_problem(user_question)
+
+
 if __name__ == "__main__":
+    # test_main()
     main()
