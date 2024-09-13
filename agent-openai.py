@@ -6,7 +6,7 @@ from code_interpreter import CodeInterpreter
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
-from rich.progress import Progress
+from rich.syntax import Syntax
 from typing import List
 
 console = Console()
@@ -41,32 +41,47 @@ tools = [
 ]
 
 math_tutor_prompt = """
-    You are a helpful math tutor. You will be provided with a math problem, and your goal will be to output a step by step solution, along with a final answer.
-    For each step, just provide the output as an equation use the explanation field to detail the reasoning.
-    I have a local code interpreter available to you, so you can ask for help with any complex calculations.
-    In order to get the solution from the code interpreter, you can use the `call_coder` function. The `call_coder` function takes a single argument, `code`, which is a string containing the Python code you want to run.    
-    Make sure to provide the code interpreter with the necessary code to solve the problem.
-    Use the same language and style of the user's question when providing the solution.
+You are a helpful math tutor. You will be provided with a math problem, and your goal will be to output a step by step solution, along with a final answer.
+For each step, just provide the output as an equation use the explanation field to detail the reasoning.
+I have a local code interpreter available to you, so you should call it for any calculations. 
+You can break down the problem into smaller parts and use the code interpreter to solve them.
+In order to get the solution from the code interpreter, you can use the `call_coder` function. 
+The `call_coder` function takes a single argument, `code`, which is a string containing the Python code you want to run.    
+Make sure to provide the code interpreter with the necessary code to solve the problem.
+Use the same language and style of the user's question when providing the solution.
+"""
+
+math_tutor_final = """
+This is the final solution that will be presented to the user, so make sure it is correct and easy to understand.
+You cannot use the `call_coder` function anymore.
+Do not comment about the solution, just provide the solution itself but in a clear and detailed way.
+Revise the solution and make it as clear as possible.
+====================
+%s
 """
 
 
 def call_coder(code: str) -> str:
     output = coder.execute(code)
     sys.stdout = sys.__stdout__
+    syntax = Syntax(code, "python", theme="github-dark", line_numbers=True)
+    console.print("")  # add a new line
     console.print(
         Panel(
-            f"[bold green]Executed Code:\n[/bold green]{code}",
-            title="Code Execution",
-            expand=False,
+            syntax,
+            title="Execução de Código",
+            expand=True,
         )
     )
     console.print(
-        Panel(f"[bold blue]Output:[/bold blue] {output}", title="Result", expand=False)
+        Panel(
+            f"[bold blue]Output:[/bold blue] {output}", title="Resultado", expand=True
+        )
     )
     return output
 
 
-def solve_math_problem(user_question):
+def solve_math_problem(user_question: str, max_steps=10):
     messages = [
         {
             "role": "assistant",
@@ -80,30 +95,27 @@ def solve_math_problem(user_question):
 
     console.print(
         Panel(
-            f"[bold yellow]Solving Math Problem:[/bold yellow]\n{user_question}",
-            title="Math Problem",
-            expand=False,
+            f"[bold yellow]Resolvendo:[/bold yellow]\n{user_question}",
+            title="Problema Matemático",
+            expand=True,
         )
     )
 
-    with Progress() as progress:
-        task = progress.add_task("[cyan]Solving Math Problem...", total=100)
-        while True:
-            progress.update(task, advance=10)
-            chat_message, finish_reason = call_chat(messages)
+    while len(messages) < max_steps:
+        chat_message, finish_reason = call_chat(messages)
 
-            if finish_reason == "stop":
-                progress.update(task, advance=100)
-                display_solution(messages)
-                break
-            elif finish_reason == "tool_calls":
-                handle_tool_calls(chat_message, messages)
-            else:
-                raise Exception(f"Unexpected finish reason: {finish_reason}")
+        if finish_reason == "stop":
+            display_solution(messages)
+            break
+        elif finish_reason == "tool_calls":
+            handle_tool_calls(chat_message, messages)
+        else:
+            raise Exception(f"Unexpected finish reason: {finish_reason}")
 
 
 def call_chat(messages: List[dict]):
     # call the OpenAI API to get a response
+    console.print(f"🚀 Calling OpenAI API ...")
     chat_response = client.chat.completions.create(
         model=MODEL,
         messages=messages,
@@ -122,9 +134,6 @@ def handle_tool_calls(chat_message, messages):
         func = tool_call.to_dict()["function"]
         func_name = func["name"]
         func_args = json.loads(func["arguments"])
-        console.print(
-            f"\n:gear: [bold magenta] Function Call:[/bold magenta] {func_name}"
-        )
         if func_name == "call_coder":
             execute_call_coder(func_args, tool_call.id, messages)
         else:
@@ -133,7 +142,6 @@ def handle_tool_calls(chat_message, messages):
 
 def execute_call_coder(func_args, tool_call_id, messages):
     code = func_args["code"]
-    console.print(":rocket: [bold green]Calling Code Interpreter...[/bold green]")
     func_output = call_coder(code)
     coder_output_message = {
         "role": "tool",
@@ -150,24 +158,53 @@ def display_solution(messages: list):
     solution = ""
     for m in messages:
         # skip tool messages. it's already displayed in the code interpreter output
-        if m['role'] == 'tool':
+        if m["role"] == "tool":
             continue
         solution += f"{m['content']}\n"
-
+    message = {"role": "user", "content": math_tutor_final % solution}
+    messages.append(message)
+    chat_message, finish_reason = call_chat(messages)
+    content = chat_message.content
     console.print("\n")
     console.print(
         Panel(
-            f"[bold green]Solution Completed:[/bold green]\n{solution}",
-            title="Completion",
-            expand=False,
+            f"[bold green]Solução Completa:[/bold green]\n{content}",
+            title="Resultado Final",
+            expand=True,
+        )
+    )
+
+
+def welcome_banner():
+    console.print(
+        Panel(
+            r'''
+[bold yellow] 
+ __  __       _   _       _____      _                                         .="=.
+|  \/  | __ _| |_| |__   |_   _|   _| |_ ___  _ __                           _/.-.-.\_     _
+| |\/| |/ _` | __| '_ \    | || | | | __/ _ \| '__|                         ( ( o o ) )    ))
+| |  | | (_| | |_| | | |   | || |_| | || (_) | |                             |/  "  \|    //
+|_|  |_|\__,_|\__|_| |_|   |_| \__,_|\__\___/|_|             .-------.        \'---'/    //
+                                                            _|~~ ~~  |_       /`"""`\\  ((
+   _   _ _____ ____     ____   ___ ____  _  _             =(_|_______|_)=    / /_,_\ \\  \\
+  | | | |  ___/ ___|   |___ \ / _ \___ \| || |              |:::::::::|      \_\\_'__/ \  ))
+  | | | | |_ | |         __) | | | |__) | || |_             |:::::::[]|       /`  /`~\  |//
+  | |_| |  _|| |___     / __/| |_| / __/|__   _|            |o=======.|      /   /    \  /
+   \___/|_|   \____|   |_____|\___/_____|  |_|              `"""""""""`  ,--`,--'\/\    /
+                                                                     '-- "--'
+[/bold yellow]
+''',
+            title="Feira das Profissões",
+            expand=True,
         )
     )
 
 
 def main():
+    welcome_banner()
     while True:
         user_question = Prompt.ask(
-            "[bold yellow]Insira um problema matemático (or digite 'exit' to sair)[/bold yellow]\n"
+            "[bold yellow]Insira um problema matemático (or digite 'exit' para sair)[/bold yellow]\n"
         )
 
         if user_question.lower() == "exit":
@@ -180,10 +217,11 @@ def main():
 
 
 def test_main():
-    user_question = "Qual é o resultado de $\\int_{0}^{3.75} x^2 dx$?"
+    welcome_banner()
+    user_question = "Determine:\n(a) $\\int_{0}^{3.75} (x^2 + sin(x))dx$;\n(b) o oitavo elemento da série de Fibonacci;\n(c) Um triângulo de lados 1, 3 e 7 pode ser retângulo?"
     solve_math_problem(user_question)
 
 
 if __name__ == "__main__":
-    # test_main()
-    main()
+    test_main()
+    # main()
