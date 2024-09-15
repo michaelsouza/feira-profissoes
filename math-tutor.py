@@ -43,10 +43,10 @@ tools = [
 math_tutor_prompt = """
 You are a helpful math tutor. You will be provided with a math problem, and your goal will be to output a step by step solution, along with a final answer.
 For each step, just provide the output as an equation use the explanation field to detail the reasoning.
-I have a local code interpreter available to you, so you should call it for any calculations. 
+I have a local code interpreter available to you, so you should call it for any calculations.
 You can break down the problem into smaller parts and use the code interpreter to solve them.
-In order to get the solution from the code interpreter, you can use the `call_coder` function. 
-The `call_coder` function takes a single argument, `code`, which is a string containing the Python code you want to run.    
+In order to get the solution from the code interpreter, you can use the `call_coder` function.
+The `call_coder` function takes a single argument, `code`, which is a string containing the Python code you want to run.
 Make sure to provide the code interpreter with the necessary code to solve the problem.
 Use the same language and style of the user's question when providing the solution.
 """
@@ -179,19 +179,19 @@ def welcome_banner():
     console.print(
         Panel(
             r'''
-[bold yellow] 
- __  __       _   _       _____      _                                         .="=.
-|  \/  | __ _| |_| |__   |_   _|   _| |_ ___  _ __                           _/.-.-.\_     _
-| |\/| |/ _` | __| '_ \    | || | | | __/ _ \| '__|                         ( ( o o ) )    ))
-| |  | | (_| | |_| | | |   | || |_| | || (_) | |                             |/  "  \|    //
-|_|  |_|\__,_|\__|_| |_|   |_| \__,_|\__\___/|_|             .-------.        \'---'/    //
-                                                            _|~~ ~~  |_       /`"""`\\  ((
-   _   _ _____ ____     ____   ___ ____  _  _             =(_|_______|_)=    / /_,_\ \\  \\
-  | | | |  ___/ ___|   |___ \ / _ \___ \| || |              |:::::::::|      \_\\_'__/ \  ))
-  | | | | |_ | |         __) | | | |__) | || |_             |:::::::[]|       /`  /`~\  |//
-  | |_| |  _|| |___     / __/| |_| / __/|__   _|            |o=======.|      /   /    \  /
-   \___/|_|   \____|   |_____|\___/_____|  |_|              `"""""""""`  ,--`,--'\/\    /
-                                                                     '-- "--'
+[bold yellow]
+ __  __       _   _       _____      _                                       .="=.
+|  \/  | __ _| |_| |__   |_   _|   _| |_ ___  _ __                          /.-.-.\_     _
+| |\/| |/ _` | __| '_ \    | || | | | __/ _ \| '__|                       ( ( o o ) )    ))
+| |  | | (_| | |_| | | |   | || |_| | || (_) | |                           |/  "  \|    //
+|_|  |_|\__,_|\__|_| |_|   |_| \__,_|\__\___/|_|           .-------.        \'---'/    //
+                                                          _|~~ ~~  |_       /`"""`\\  ((
+   _   _ _____ ____     ____   ___ ____  _  _           =(_|_______|_)=    / /_,_\ \\  \\
+  | | | |  ___/ ___|   |___ \ / _ \___ \| || |            |:::::::::|      \_\\_'__/ \  ))
+  | | | | |_ | |         __) | | | |__) | || |            |:::::::[]|       /`  /`~\  |//
+  | |_| |  _|| |___     / __/| |_| / __/|__   _|          |o=======.|      /   /       /
+   \___/|_|   \____|   |_____|\___/_____|  |_|            `"""""""""`  ,--`,--'\/\____/
+                                                                       '-- "--'
 [/bold yellow]
 ''',
             title="Feira das Profissões",
