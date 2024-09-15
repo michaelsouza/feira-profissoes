@@ -11,7 +11,8 @@ from typing import List
 
 console = Console()
 
-load_dotenv()
+env_path = "env.txt"
+load_dotenv(dotenv_path=env_path)
 
 client = OpenAI()
 coder = CodeInterpreter()
